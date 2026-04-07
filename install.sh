@@ -32,7 +32,21 @@ if [ "$EUID" -eq 0 ]; then
 else
     INSTALL_USER="$USER"
     USE_SUDO="sudo"
-    echo -eINSTALL_USER | grep -q gpio; then
+    echo -e "${GREEN}✓${NC} Installation für aktuellen Benutzer: $INSTALL_USER"
+fi
+
+# Python3 überprüfen
+echo -e "${YELLOW}[1/6]${NC} Überprüfe Python-Installation..."
+if ! command -v python3 &> /dev/null; then
+    echo -e "${RED}Python3 ist nicht installiert!${NC}"
+    echo "Installiere mit: sudo apt-get install python3 python3-pip python3-venv"
+    exit 1
+fi
+echo -e "${GREEN}✓${NC} Python3 gefunden: $(python3 --version)"
+
+# GPIO-Gruppe überprüfen
+echo -e "${YELLOW}[2/6]${NC} Überprüfe GPIO-Berechtigungen..."
+if groups $INSTALL_USER | grep -q gpio; then
     echo -e "${GREEN}✓${NC} Benutzer $INSTALL_USER ist bereits in der gpio-Gruppe"
 else
     echo -e "${YELLOW}!${NC} Füge Benutzer zur gpio-Gruppe hinzu..."
@@ -40,41 +54,22 @@ else
         usermod -a -G gpio $INSTALL_USER
     else
         sudo usermod -a -G gpio $INSTALL_USER
-    fiprüfe Python-Installation..."
-if ! command -v python3 &> /dev/null; then
-    echo -e "${RED}Python3 ist nicht installiert!${NC}"
-    echo "Installiere mit: sudo apt-get install python3 python3-pip python3-venv"
-    exit 1
-fiif [ "$EUID" -eq 0 ]; then
+    fi
+    echo -e "${GREEN}✓${NC} Benutzer hinzugefügt. ${RED}Bitte neu anmelden oder Pi neu starten!${NC}"
+fi
+
+# Virtual Environment erstellen
+echo -e "${YELLOW}[3/6]${NC} Erstelle Virtual Environment..."
+if [ -d "venv" ]; then
+    echo -e "${YELLOW}!${NC} venv existiert bereits, überspringe..."
+else
+    if [ "$EUID" -eq 0 ]; then
         # Als root: für Zielbenutzer erstellen
         sudo -u $INSTALL_USER python3 -m venv venv
         chown -R $INSTALL_USER:$INSTALL_USER venv
     else
         python3 -m venv venv
     fi
-echo -e "${GREEN}✓${NC} Python3 gefunden: $(python3 --version)"
-
-# GPIO-Gruppe überprüfen
-echo -e "${YELLOW}[2/6]${NC} Überprüfe GPIO-Berechtigungen..."
-if groups $USER | grep -q gpio; then
-    echo -e "${GREEN}✓${NC} Benutzer $USER ist bereits in der gpio-Gruppe"
-else
-    echo -e "${YELLOW}!${NC} Füge Benutzer zur gpio-Gruppe hinzu..."
-    sudo usermod -a -G gpio $USER
-    echo -e "${GREEN}✓${NC} Benutzer hinzugefügt. ${RED}Bitte neu anmelden oder Pi neu starten!${NC}"
-fi
-
-# Virtual Environment erstellen
-if [ "$EUID" -eq 0 ]; then
-    # Als root für Zielbenutzer installieren
-    sudo -u $INSTALL_USER bash -c "source venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt"
-else
-    source venv/bin/activate
-    pip install --upgrade pip
-    pip install -r requirements.txt
-finv existiert bereits, überspringe..."
-else
-    python3 -m venv venv
     echo -e "${GREEN}✓${NC} Virtual Environment erstellt"
 fi
 
