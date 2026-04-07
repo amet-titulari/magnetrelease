@@ -1,0 +1,15 @@
+[Unit]
+Description=Waveshare Relay Hat Controller
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/magnetrelease
+Environment="PATH=/home/pi/magnetrelease/venv/bin"
+ExecStart=/home/pi/magnetrelease/venv/bin/python /home/pi/magnetrelease/app.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
