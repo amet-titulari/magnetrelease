@@ -14,20 +14,44 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Überprüfen ob als root ausgeführt wird
+# Benutzer bestimmen (root oder regulärer Benutzer)
 if [ "$EUID" -eq 0 ]; then 
-    echo -e "${RED}Bitte nicht als root ausführen!${NC}"
-    echo "Führe das Skript als normaler Benutzer aus (z.B. pi)"
-    exit 1
-fi
-
-# Python3 überprüfen
-echo -e "${YELLOW}[1/6]${NC} Überprüfe Python-Installation..."
+    echo -e "${YELLOW}Script wird als root ausgeführt${NC}"
+    read -p "Für welchen Benutzer soll installiert werden? [pi]: " TARGET_USER
+    TARGET_USER=${TARGET_USER:-pi}
+    
+    # Prüfen ob Benutzer existiert
+    if ! id "$TARGET_USER" &>/dev/null; then
+        echo -e "${RED}Benutzer '$TARGET_USER' existiert nicht!${NC}"
+        exit 1
+    fi
+    
+    INSTALL_USER="$TARGET_USER"
+    USE_SUDO=""
+    echo -e "${GREEN}✓${NC} Installation für Benutzer: $INSTALL_USER"
+else
+    INSTALL_USER="$USER"
+    USE_SUDO="sudo"
+    echo -eINSTALL_USER | grep -q gpio; then
+    echo -e "${GREEN}✓${NC} Benutzer $INSTALL_USER ist bereits in der gpio-Gruppe"
+else
+    echo -e "${YELLOW}!${NC} Füge Benutzer zur gpio-Gruppe hinzu..."
+    if [ "$EUID" -eq 0 ]; then
+        usermod -a -G gpio $INSTALL_USER
+    else
+        sudo usermod -a -G gpio $INSTALL_USER
+    fiprüfe Python-Installation..."
 if ! command -v python3 &> /dev/null; then
     echo -e "${RED}Python3 ist nicht installiert!${NC}"
     echo "Installiere mit: sudo apt-get install python3 python3-pip python3-venv"
     exit 1
-fi
+fiif [ "$EUID" -eq 0 ]; then
+        # Als root: für Zielbenutzer erstellen
+        sudo -u $INSTALL_USER python3 -m venv venv
+        chown -R $INSTALL_USER:$INSTALL_USER venv
+    else
+        python3 -m venv venv
+    fi
 echo -e "${GREEN}✓${NC} Python3 gefunden: $(python3 --version)"
 
 # GPIO-Gruppe überprüfen
@@ -41,28 +65,45 @@ else
 fi
 
 # Virtual Environment erstellen
-echo -e "${YELLOW}[3/6]${NC} Erstelle Virtual Environment..."
-if [ -d "venv" ]; then
-    echo -e "${YELLOW}!${NC} venv existiert bereits, überspringe..."
+if [ "$EUID" -eq 0 ]; then
+    # Als root für Zielbenutzer installieren
+    sudo -u $INSTALL_USER bash -c "source venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt"
+else
+    source venv/bin/activate
+    pip install --upgrade pip
+    pip install -r requirements.txt
+finv existiert bereits, überspringe..."
 else
     python3 -m venv venv
     echo -e "${GREEN}✓${NC} Virtual Environment erstellt"
 fi
 
-# Dependencies installieren
-echo -e "${YELLOW}[4/6]${NC} Installiere Python-Abhängigkeiten..."
-source venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
-echo -e "${GREEN}✓${NC} Abhängigkeiten installiert"
-
-# Systemd Service einrichten
-echo -e "${YELLOW}[5/6]${NC} Systemd-Service konfigurieren..."
-read -p "Möchtest du den Service für automatischen Start einrichten? (j/N) " -n 1 -r
-echo
-if [[ $REPLY =~ ^[JjYy]$ ]]; then
-    # Pfade in der Service-Datei anpassen
-    CURRENT_DIR=$(pwd)
+    # Temporäre Service-Datei mit aktuellen Pfaden erstellen
+    sed -e "s|/home/pi/magnetrelease|$CURRENT_DIR|g" \
+        -e "s|User=pi|User=$INSTALL_USER|g" \
+        relay-controller.service > /tmp/relay-controller.service
+    
+    if [ "$EUID" -eq 0 ]; then
+        cp /tmp/relay-controller.service /etc/systemd/system/relay-controller.service
+        systemctl daemon-reload
+        systemctl enable relay-controller.service
+    else
+        sudo cp /tmp/relay-controller.service /etc/systemd/system/relay-controller.service
+        sudo systemctl daemon-reload
+        sudo systemctl enable relay-controller.service
+    figuif [ "$EUID" -eq 0 ]; then
+            systemctl start relay-controller.service
+            echo -e "${GREEN}✓${NC} Service gestartet"
+            sleep 2
+            systemctl status relay-controller.service --no-pager
+        else
+            sudo systemctl start relay-controller.service
+            echo -e "${GREEN}✓${NC} Service gestartet"
+            sleep 2
+            sudo systemctl status relay-controller.service --no-pager
+        fi
+    else
+        echo "Service kann später mit '${USE_SUDO}
     CURRENT_USER=$(whoami)
     
     # Temporäre Service-Datei mit aktuellen Pfaden erstellen
